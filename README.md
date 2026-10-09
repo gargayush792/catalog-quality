@@ -46,50 +46,58 @@ For the take-home I moved the checks to the title. The description is empty for 
 
 ## Algorithm
 
-For each product:
+Processes product catalog entries row-by-row to verify structured metadata against titles and package details.
 
-**1. Clean the title**
+---
 
-- Remove `brand` and `seller_entered_brand` from the title (case-insensitive, first match, only if the brand has 3+ characters). Otherwise "PRATHAM BLUE" reads as the colour blue, and "DAKU SHOES" as a shoe.
-- For the product type check only: cut everything after "pair it with" / "team it with" / "wear it with".
+### Step 1: Clean the Title
 
-**2. Decide which attributes apply, from `cms_vertical`**
+* **Remove Brand Names:** Drop `brand` and `seller_entered_brand` (case-insensitive, first match, length $\ge$ 3 chars) to avoid false matches (e.g., *"PRATHAM BLUE"* $\rightarrow$ color blue; *"DAKU SHOES"* $\rightarrow$ footwear).
+* **Truncate Cross-Sell Text:** Drop text after *"pair it with"*, *"team it with"*, or *"wear it with"* so complementary items aren't misidentified as the main product.
 
-These are keyword rules curated by hand, not learned from the data.
+---
 
-- All products: brand, ideal_for, color, cms_vertical
-- Tops, dresses, kurtas, jackets, outfits: + pattern, size, sleeve
-- Bottoms, sarees, innerwear: + pattern, size
-- Footwear: + size, outer_material
-- Jewellery, bags, watches, fabric: nothing extra
+### Step 2: Select Applicable Attributes (`cms_vertical`)
 
-**3. Run the checks**
+Rule-based assignment by vertical:
 
-Each check returns support, contradict, invalid, or nothing (when the row has no second source).
+* **All Products:** `brand`, `ideal_for`, `color`, `cms_vertical`
+* **Tops, Dresses, Kurtas, Jackets, Outfits:** + `pattern`, `size`, `sleeve`
+* **Bottoms, Sarees, Innerwear:** + `pattern`, `size`
+* **Footwear:** + `size`, `outer_material`
+* **Jewellery, Bags, Watches, Fabric:** Base attributes only
 
-- **ideal_for**: every word must be on a fixed audience list (men, women, boys, girls, baby, kids, unisex, couple, plus filler words like "and"/"for"), otherwise it's invalid. Compare with the `analytic_super_category` prefix: `Mens*` = men, `Women*` = women, `Kid*` = boys or girls. Then compare with Men/Women/Boys/Girls words in the title. Only direct opposites are flagged (men vs women, boys vs girls). "For girls" on a women's product is ignored. A title that names both men and women is ignored as keyword stuffing.
-- **color and color_code**: map each to a colour family using a handwritten phrase list, longest phrase first (light blue / navy → blue, cream / off white → white, meroon → maroon, wht → white). There is no fuzzy matching. Compare against colours in the title, and against each other. Gold/silver/copper in the title can confirm a value but not contradict one, because on jewellery those words are usually the metal. "Multicolor" in the title doesn't deny a specific colour.
-- **brand**: lowercase both brands and keep only a–z and 0–9. They count as the same brand if they're equal, or if the shorter one (3+ characters) appears inside the longer one. Otherwise that's a contradiction ("BG TEX" vs "BG TAX", "3SIX5" vs "Aayu"). If the title contains the brand, that counts as support.
-- **cms_vertical**: match product nouns in the title, most specific first (t-shirt before shirt, earring before ring, "shirt stud" / "saree cover" before shirt / saree). `kids_` and `uniform_` variants are allowed. Two garment nouns, or the words set / combo / co-ord, allow the combo verticals.
-- **sleeve, pattern, material**: only explicit opposites are flagged (half vs full sleeve, solid vs printed, cotton vs polyester). Embroidered vs printed is not a conflict, since one garment can be both.
-- **pack_of**: must be a positive integer. Compare with "pack of N" in the title or `sales_package`, and with `contents_in_sales_package` when that number differs.
-- **size**: there's no size chart in the data, so only placeholders like NA, or sentences, are marked invalid.
+---
 
-**4. One verdict per attribute, in this order**
+### Step 3: Execute Attribute Checks
 
-1. empty → missing
-2. any invalid → invalid
-3. if the title contradicts the value, drop support from a sibling column (color_code, contents), because that is often the same entry copied twice
-4. support and contradict together → contested
-5. contradict → contradicted
-6. support → supported
-7. else → unverified
+Each check yields **`support`**, **`contradict`**, **`invalid`**, or **`nothing`** (no secondary source).
 
-**5. Score**
+1. **`ideal_for`:** Words must be on the audience whitelist (*men, women, boys, girls, baby, kids, unisex, couple* + filler words like *and/for*); otherwise **`invalid`**. Compare against `analytic_super_category` prefix (`Mens*`, `Women*`, `Kid*`) and title keywords. Only direct opposites flag a conflict (*men* vs *women*, *boys* vs *girls*). Both genders in a title are ignored as keyword stuffing.
+2. **`color` / `color_code`:** Map phrases to base colors using longest-phrase-first matching (*light blue* $\rightarrow$ *blue*, *meroon* $\rightarrow$ *maroon*). No fuzzy matching. Compare mapped colors across title and metadata. *Gold/silver/copper* in titles can confirm but never contradict (jewellery metals). *"Multicolor"* in title never contradicts.
+3. **`brand`:** Lowercase and strip non-alphanumeric chars (`a-z`, `0-9`). Match if identical or if the shorter string ($\ge$ 3 chars) is inside the longer one. Otherwise flag as **`contradict`**. Title matches count as **`support`**.
+4. **`cms_vertical`:** Scan title for product nouns, matching most specific first (*t-shirt* before *shirt*, *earring* before *ring*). Allow `kids_`/`uniform_` prefixes. Two garment nouns or terms like *set/combo/co-ord* map to combo verticals.
+5. **`sleeve` / `pattern` / `material`:** Flag direct binary opposites only (*half* vs *full sleeve*, *solid* vs *printed*, *cotton* vs *polyester*). Overlapping attributes (*embroidered* + *printed*) are allowed.
+6. **`pack_of`:** Must be a positive integer. Compare with title *"pack of N"*, `sales_package`, and `contents_in_sales_package`.
+7. **`size`:** Flag placeholders (*NA*, sentences) as **`invalid`** (no size chart available).
 
-- clean = supported + unverified
-- defect = contradicted + invalid + contested
-- score = clean / applicable
+---
+
+### Step 4: Attribute Verdict Priority
+
+Assign a single verdict using strict precedence:
+
+$$\begin{aligned} 1.&\quad \text{Empty value} &\longrightarrow\quad &\mathbf{missing} \\ 2.&\quad \text{Any invalid check} &\longrightarrow\quad &\mathbf{invalid} \\ 3.&\quad \text{Title contradicts value} &\longrightarrow\quad &\text{Drop support from sibling fields (\textit{color\_code}, \textit{contents})} \\ 4.&\quad \text{Support AND contradict} &\longrightarrow\quad &\mathbf{contested} \\ 5.&\quad \text{Contradict only} &\longrightarrow\quad &\mathbf{contradicted} \\ 6.&\quad \text{Support only} &\longrightarrow\quad &\mathbf{supported} \\ 7.&\quad \text{Otherwise} &\longrightarrow\quad &\mathbf{unverified} \end{aligned}$$
+
+---
+
+### Step 5: Scoring
+
+$$\text{clean} = \text{supported} + \text{unverified}$$
+
+$$\text{defect} = \text{contradicted} + \text{invalid} + \text{contested}$$
+
+$$\text{Score} = \frac{\text{clean}}{\text{applicable attributes}}$$
 
 ## Run
 
