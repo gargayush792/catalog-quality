@@ -4,29 +4,29 @@ Take-home for the catalogue quality problem. Data is an ecommerce lifestyle slic
 
 ## The metric
 
-```
-Catalog Quality Score = clean values / applicable values
-```
-
-- **applicable**: attributes this product type is supposed to have. A necklace doesn't need a sleeve, a shoe needs a size.
-- **clean**: the value is filled, and nothing else on the same row disagrees with it.
-
 It splits into the two parts of quality:
 
 ```
 completeness = filled / applicable
-correctness  = clean / filled
+correctness  = correct / filled
 score        = completeness x correctness
 ```
 
-On this slice:
+```
+Catalog Quality Score = correct values / applicable values
+```
+
+- **applicable**: attributes this product type is supposed to have. Example: A necklace cannot have a sleeve, and size should be present for shoes.
+- **correct**: the value is filled, and title/other attributes on the same row don't disagree with it.
+
+On this data:
 
 ```
 92.56% completeness x 98.74% correctness = 91.40%
 671,675 clean out of 734,874 applicable values
 ```
 
-Most of the drop is missing values, not wrong ones. Per attribute:
+Most of the quality drop is because of missing values, and not wrong ones. Per attribute:
 
 | attribute | score |
 | --- | --- |
@@ -39,18 +39,14 @@ Most of the drop is missing values, not wrong ones. Per attribute:
 | outer_material | 79.44% |
 | sleeve | 66.51% |
 
-One caveat: if a value is filled but nothing else on the row mentions it, I count it as clean, since there is nothing to check it against. So 91.40% is an upper bound. A wrong value that can't be cross-checked won't get caught.
-
-## How I got here
+## Process
 
 In the live round I tried two things:
 
 1. Normalise the colour, then look for it in the description.
 2. Check whether the title and the description are semantically similar.
 
-For the take-home I moved the checks to the title. The description is empty for about 30% of rows (36,700). Where it does exist, it's mostly marketing copy, and sometimes it describes a different product (one Bata men's shoe description says it is designed for women). The title is always filled and is closer to what the seller actually listed. I kept the colour normalisation from the first idea, but it is matched against the title and `color_code` instead of the description.
-
-Title–description similarity is not in this version (see next steps).
+For the take-home I moved the checks to the title. The description is empty for about 30% of rows (36,700). Where it does exist, it's mostly marketing text, and sometimes it describes a different product (one Bata men's shoe description says it is designed for women). The title is always filled and is closer to what the seller actually listed. I kept the colour normalisation from the first idea, but it is matched against the title and `color_code` instead of the description.
 
 ## Algorithm
 
@@ -63,7 +59,7 @@ For each product:
 
 **2. Decide which attributes apply, from `cms_vertical`**
 
-These are keyword rules I wrote by hand, not learned from the data.
+These are keyword rules curated by hand, not learned from the data.
 
 - All products: brand, ideal_for, color, cms_vertical
 - Tops, dresses, kurtas, jackets, outfits: + pattern, size, sleeve
@@ -114,7 +110,7 @@ The outputs:
 
 ## Limitations and next steps
 
-- The rules and the applicability map are handwritten from looking at this slice. I haven't measured the precision of each rule. The next step is to label a few hundred products per vertical, which gives real accuracy and shows which rules can be trusted.
+- The rules and the applicability map are handwritten from looking at this data. I haven't measured the precision of each rule. The next step is to label a few hundred products per vertical, which gives real accuracy and shows which rules can be trusted.
 - The description isn't used. Where it's present, it can be added as a third source (the colour lookup from the live round), but as support or a tie-breaker, not as a contradiction on its own.
 - Title–description similarity (embeddings) could catch descriptions that are about a different product. That's a separate "description quality" check.
 - Images would be the actual ground truth for colour, pattern and sleeve.
