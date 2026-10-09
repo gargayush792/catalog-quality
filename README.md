@@ -12,10 +12,6 @@ correctness  = correct / filled
 score        = completeness x correctness
 ```
 
-```
-Catalog Quality Score = correct values / applicable values
-```
-
 - **applicable**: attributes this product type is supposed to have. Example: A necklace cannot have a sleeve, and size should be present for shoes.
 - **correct**: the value is filled, and title/other attributes on the same row don't disagree with it.
 
