@@ -84,10 +84,15 @@ Each check yields **`support`**, **`contradict`**, **`invalid`**, or **`nothing`
 ---
 
 ### Step 4: Attribute Verdict Priority
-
 Assign a single verdict using strict precedence:
 
-$$\begin{aligned} 1.&\quad \text{Empty value} &\longrightarrow\quad &\mathbf{missing} \\ 2.&\quad \text{Any invalid check} &\longrightarrow\quad &\mathbf{invalid} \\ 3.&\quad \text{Title contradicts value} &\longrightarrow\quad &\text{Drop support from sibling fields (\textit{color\_code}, \textit{contents})} \\ 4.&\quad \text{Support AND contradict} &\longrightarrow\quad &\mathbf{contested} \\ 5.&\quad \text{Contradict only} &\longrightarrow\quad &\mathbf{contradicted} \\ 6.&\quad \text{Support only} &\longrightarrow\quad &\mathbf{supported} \\ 7.&\quad \text{Otherwise} &\longrightarrow\quad &\mathbf{unverified} \end{aligned}$$
+1. **Empty value** $\longrightarrow$ **missing**
+2. **Any invalid check** $\longrightarrow$ **invalid**
+3. **Title contradicts value** $\longrightarrow$ Drop support from sibling fields (`color_code`, `contents`)
+4. **Support AND contradict** $\longrightarrow$ **contested**
+5. **Contradict only** $\longrightarrow$ **contradicted**
+6. **Support only** $\longrightarrow$ **supported**
+7. **Otherwise** $\longrightarrow$ **unverified**
 
 ---
 
